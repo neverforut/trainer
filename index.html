@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#0f1117">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Тренажёр">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-512.png">
+<link rel="icon" type="image/png" href="icon-192.png">
+<title>Пустые: тренажёр ума</title>
+<style>
+:root{
+  --bg:#0f1117; --card:#181b24; --card2:#222634; --line:#2c3142;
+  --text:#eceef5; --mute:#8d93a8; --acc:#7c9cff; --ok:#4cd39a; --bad:#ff6b7a; --warn:#ffc65c;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  -webkit-user-select:none;user-select:none;touch-action:manipulation}
+#app{max-width:480px;margin:0 auto;min-height:100%;padding:max(16px,env(safe-area-inset-top)) 16px max(32px,env(safe-area-inset-bottom))}
+h1{font-size:22px;margin:4px 0 2px}
+.sub{color:var(--mute);font-size:14px;margin:0 0 16px}
+.bar{display:flex;gap:8px;margin-bottom:16px}
+.pill{flex:1;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 12px}
+.pill b{display:block;font-size:20px}
+.pill span{color:var(--mute);font-size:12px}
+.grid{display:grid;gap:10px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px 16px;
+  display:flex;align-items:center;gap:14px;cursor:pointer;text-align:left;color:var(--text);width:100%;font:inherit}
+.card:active{background:var(--card2)}
+.ico{font-size:26px;width:44px;height:44px;border-radius:12px;background:var(--card2);display:flex;align-items:center;justify-content:center;flex:none}
+.card .t{font-weight:600;font-size:16px}
+.card .d{color:var(--mute);font-size:13px;margin-top:2px}
+.card .best{margin-left:auto;text-align:right;font-size:12px;color:var(--mute);flex:none}
+.card .best b{display:block;color:var(--acc);font-size:16px}
+.top{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.back{background:var(--card);border:1px solid var(--line);color:var(--text);border-radius:12px;padding:8px 14px;font:inherit;font-size:14px}
+.stat{color:var(--mute);font-size:14px}
+.stat b{color:var(--text)}
+.stage{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:18px;min-height:340px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;text-align:center}
+.big{font-size:44px;font-weight:700;letter-spacing:4px;font-variant-numeric:tabular-nums}
+.mid{font-size:30px;font-weight:700;font-variant-numeric:tabular-nums}
+.hint{color:var(--mute);font-size:14px;line-height:1.4}
+.btn{background:var(--acc);color:#0b1020;border:0;border-radius:14px;padding:14px 22px;font:inherit;font-weight:700;font-size:16px;width:100%}
+.btn.sec{background:var(--card2);color:var(--text)}
+.btn:active{opacity:.85}
+.keys{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;width:100%}
+.key{background:var(--card2);color:var(--text);border:0;border-radius:12px;padding:14px 0;font:inherit;font-size:22px;font-weight:600}
+.key:active{background:var(--line)}
+.ans{min-height:44px;font-size:34px;font-weight:700;letter-spacing:3px;font-variant-numeric:tabular-nums}
+.sg{display:grid;gap:6px;width:100%}
+.cell{aspect-ratio:1/1;background:var(--card2);border:0;border-radius:10px;color:var(--text);font:inherit;font-size:22px;font-weight:700;
+  display:flex;align-items:center;justify-content:center;transition:background .12s}
+.cell.on{background:var(--acc)}
+.cell.good{background:var(--ok);color:#06231a}
+.cell.bad{background:var(--bad)}
+.cell.done{background:var(--line);color:var(--mute)}
+.opts{display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%}
+.opt{background:var(--card2);color:var(--text);border:2px solid transparent;border-radius:14px;padding:16px 0;font:inherit;font-size:22px;font-weight:700}
+.opt.good{border-color:var(--ok);background:#143327}
+.opt.bad{border-color:var(--bad);background:#3a1a20}
+.lives{letter-spacing:3px}
+.result{font-size:15px;color:var(--mute)}
+.result b{color:var(--text)}
+.tip{margin-top:18px;color:var(--mute);font-size:12px;line-height:1.5;text-align:center}
+.timerbar{height:6px;border-radius:3px;background:var(--card2);width:100%;overflow:hidden}
+.timerbar i{display:block;height:100%;background:var(--acc);width:100%}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+(function(){
+"use strict";
+
+/* ---------- storage (works even if blocked) ---------- */
+var mem = {};
+function load(){
+  try{ var s = localStorage.getItem("blank_trainer_v1"); if(s) return JSON.parse(s); }catch(e){}
+  return null;
+}
+function save(){
+  try{ localStorage.setItem("blank_trainer_v1", JSON.stringify(data)); }catch(e){}
+}
+var data = load() || {best:{}, days:[], plays:0};
+if(!data.best) data.best = {};
+if(!data.days) data.days = [];
+
+function today(){
+  var d = new Date();
+  return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+}
+function streak(){
+  var set = {}; data.days.forEach(function(x){set[x]=1;});
+  var n = 0, d = new Date();
+  if(!set[today()]) d.setDate(d.getDate()-1);
+  while(true){
+    var k = d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+    if(set[k]){ n++; d.setDate(d.getDate()-1); } else break;
+  }
+  return n;
+}
+function todayCount(){ return (data.todayDate===today()) ? (data.todayPlays||0) : 0; }
+function markPlayed(){
+  var t = today();
+  if(data.days.indexOf(t) < 0) data.days.push(t);
+  if(data.todayDate !== t){ data.todayDate = t; data.todayPlays = 0; }
+  data.todayPlays++;
+  data.plays = (data.plays||0)+1;
+  save();
+}
+function setBest(key, val, lowerIsBetter){
+  var cur = data.best[key];
+  var better = (cur===undefined) || (lowerIsBetter ? val < cur : val > cur);
+  if(better){ data.best[key] = val; save(); }
+  return better;
+}
+
+/* ---------- helpers ---------- */
+var app = document.getElementById("app");
+var timers = [];
+function later(fn, ms){ var id = setTimeout(fn, ms); timers.push(id); return id; }
+function clearTimers(){ timers.forEach(function(t){clearTimeout(t);clearInterval(t);}); timers = []; }
+function every(fn, ms){ var id = setInterval(fn, ms); timers.push(id); return id; }
+function rnd(a,b){ return Math.floor(Math.random()*(b-a+1))+a; }
+function shuffle(a){ for(var i=a.length-1;i>0;i--){var j=rnd(0,i);var t=a[i];a[i]=a[j];a[j]=t;} return a; }
+function el(html){ var d=document.createElement("div"); d.innerHTML=html.trim(); return d.firstChild; }
+function fmtBest(key, suffix, lower){
+  var v = data.best[key];
+  if(v===undefined) return "<b>—</b>рекорд";
+  return "<b>"+(lower? v.toFixed(1): v)+(suffix||"")+"</b>рекорд";
+}
+
+/* ---------- home ---------- */
+var GAMES = [
+  {id:"digits", ico:"🔢", t:"Память на цифры", d:"Запомни ряд и повтори", run:gDigits, key:"digits", sfx:"", low:false},
+  {id:"schulte", ico:"🎯", t:"Таблица Шульте", d:"Найди 1–25 по порядку", run:gSchulte, key:"schulte", sfx:" с", low:true},
+  {id:"math", ico:"➕", t:"Устный счёт", d:"60 секунд, чем больше — тем лучше", run:gMath, key:"math", sfx:"", low:false},
+  {id:"seq", ico:"🧩", t:"Закономерности", d:"Продолжи числовой ряд", run:gSeq, key:"seq", sfx:"/10", low:false},
+  {id:"grid", ico:"🟦", t:"Память позиций", d:"Запомни клетки на поле", run:gGrid, key:"grid", sfx:" ур.", low:false}
+];
+
+function home(){
+  clearTimers();
+  var s = streak();
+  var h = '<h1>Пустые · тренажёр</h1><p class="sub">Память, логика, концентрация. Один подход — 1–3 минуты.</p>'
+    + '<div class="bar">'
+    + '<div class="pill"><b>'+s+'</b><span>дней подряд</span></div>'
+    + '<div class="pill"><b>'+todayCount()+'</b><span>игр сегодня</span></div>'
+    + '<div class="pill"><b>'+(data.plays||0)+'</b><span>всего игр</span></div></div>'
+    + '<div class="grid">';
+  GAMES.forEach(function(g){
+    h += '<button class="card" data-g="'+g.id+'"><div class="ico">'+g.ico+'</div><div><div class="t">'+g.t+'</div><div class="d">'+g.d+'</div></div><div class="best">'+fmtBest(g.key,g.sfx,g.low)+'</div></button>';
+  });
+  h += '</div><div class="tip">Цель на день: по одному подходу в каждой игре.<br>Регулярность важнее длины тренировки.</div>';
+  app.innerHTML = h;
+  app.querySelectorAll(".card").forEach(function(b){
+    b.onclick = function(){
+      var g = GAMES.filter(function(x){return x.id===b.getAttribute("data-g");})[0];
+      g.run();
+    };
+  });
+}
+
+function shell(title, statHtml){
+  clearTimers();
+  app.innerHTML = '<div class="top"><button class="back" id="bk">← Назад</button><div class="stat" id="st">'+(statHtml||"")+'</div></div>'
+    + '<div class="stage" id="stage"></div>';
+  document.getElementById("bk").onclick = home;
+  return document.getElementById("stage");
+}
+function setStat(h){ var s=document.getElementById("st"); if(s) s.innerHTML=h; }
+
+function finish(stage, title, lines, againFn){
+  markPlayed();
+  stage.innerHTML = '<div class="mid">'+title+'</div><div class="result">'+lines.join("<br>")+'</div>'
+    + '<button class="btn" id="again">Ещё раз</button><button class="btn sec" id="menu">В меню</button>';
+  document.getElementById("again").onclick = againFn;
+  document.getElementById("menu").onclick = home;
+}
+
+/* ---------- 1. digits ---------- */
+function gDigits(){
+  var stage = shell("digits");
+  var n = 3, lives = 3, best = 0;
+  function livesStr(){ return '<span class="lives">'+"❤".repeat(lives)+'</span>'; }
+  function round(){
+    setStat('Длина <b>'+n+'</b> · '+livesStr());
+    var seq = ""; for(var i=0;i<n;i++) seq += rnd(0,9);
+    stage.innerHTML = '<div class="hint">Запомни</div><div class="big">'+seq+'</div><div class="timerbar"><i id="tb"></i></div>';
+    var dur = 900 + n*450;
+    var tb = document.getElementById("tb");
+    tb.style.transition = "width "+dur+"ms linear";
+    requestAnimationFrame(function(){ requestAnimationFrame(function(){ tb.style.width = "0%"; }); });
+    later(function(){ ask(seq); }, dur);
+  }
+  function ask(seq){
+    var typed = "";
+    stage.innerHTML = '<div class="hint">Введи ряд ('+n+' цифр)</div><div class="ans" id="ans">&nbsp;</div>'
+      + keypad();
+    wireKeys(stage, function(k){
+      if(k==="del") typed = typed.slice(0,-1);
+      else if(typed.length < n) typed += k;
+      document.getElementById("ans").textContent = typed || " ";
+      if(typed.length === n){
+        var ok = (typed === seq);
+        document.getElementById("ans").style.color = ok ? "var(--ok)" : "var(--bad)";
+        if(ok){ best = Math.max(best, n); n++; }
+        else { lives--; if(n>3) n--; }
+        later(function(){
+          if(lives<=0) end(); else round();
+        }, ok ? 450 : 1100);
+        if(!ok) document.getElementById("ans").textContent = typed+" ≠ "+seq;
+      }
+    });
+  }
+  function end(){
+    var nb = setBest("digits", best, false);
+    finish(stage, "Макс. длина: "+best, [nb? "Новый рекорд!" : "Рекорд: <b>"+data.best.digits+"</b>"], gDigits);
+  }
+  round();
+}
+function keypad(){
+  var h = '<div class="keys">';
+  for(var i=1;i<=9;i++) h += '<button class="key" data-k="'+i+'">'+i+'</button>';
+  h += '<button class="key" data-k="del">⌫</button><button class="key" data-k="0">0</button><button class="key" data-k="ok" style="visibility:hidden">·</button></div>';
+  return h;
+}
+function wireKeys(root, fn){
+  root.querySelectorAll(".key").forEach(function(b){
+    b.onclick = function(){ fn(b.getAttribute("data-k")); };
+  });
+}
+
+/* ---------- 2. Schulte ---------- */
+function gSchulte(){
+  var stage = shell("schulte");
+  var N = 25, next = 1, t0 = 0;
+  setStat('Ищи: <b>1</b>');
+  stage.innerHTML = '<div class="hint">Нажимай числа от 1 до 25 по порядку как можно быстрее. Взгляд держи в центре таблицы.</div><button class="btn" id="go">Старт</button>';
+  document.getElementById("go").onclick = start;
+  function start(){
+    var nums = shuffle(Array.apply(null,{length:N}).map(function(_,i){return i+1;}));
+    var h = '<div class="sg" style="grid-template-columns:repeat(5,1fr)">';
+    nums.forEach(function(v){ h += '<button class="cell" data-v="'+v+'">'+v+'</button>'; });
+    h += '</div>';
+    stage.innerHTML = h;
+    next = 1; t0 = Date.now();
+    var tick = every(function(){ setStat('Ищи: <b>'+next+'</b> · '+((Date.now()-t0)/1000).toFixed(1)+' с'); }, 100);
+    stage.querySelectorAll(".cell").forEach(function(c){
+      c.onclick = function(){
+        var v = +c.getAttribute("data-v");
+        if(v === next){
+          c.classList.add("done"); next++;
+          if(next > N){
+            clearInterval(tick);
+            var t = (Date.now()-t0)/1000;
+            var nb = setBest("schulte", t, true);
+            finish(stage, t.toFixed(1)+" с", [nb? "Новый рекорд!" : "Рекорд: <b>"+data.best.schulte.toFixed(1)+" с</b>", "Хороший ориентир: меньше 30 с"], gSchulte);
+          }
+        } else {
+          c.classList.add("bad"); later(function(){ c.classList.remove("bad"); }, 200);
+        }
+      };
+    });
+  }
+}
+
+/* ---------- 3. Mental math ---------- */
+function gMath(){
+  var stage = shell("math");
+  var score = 0, wrong = 0, level = 1, endAt = 0, cur = null, typed = "";
+  stage.innerHTML = '<div class="hint">60 секунд. Решай примеры в уме — ответ проверяется автоматически, как только введёшь все цифры.</div><button class="btn" id="go">Старт</button>';
+  document.getElementById("go").onclick = start;
+  function gen(){
+    var a,b,op,ans,s;
+    var r = rnd(1,100);
+    var hi = 8 + level*6;
+    if(r<=35 || level===1 && r<=60){ a=rnd(2,hi); b=rnd(2,hi); op="+"; ans=a+b; }
+    else if(r<=65){ a=rnd(5,hi+10); b=rnd(2,a-1); op="−"; ans=a-b; }
+    else if(r<=90){ var m = Math.min(5+level*2, 12); a=rnd(2,m); b=rnd(2,m); op="×"; ans=a*b; }
+    else { b=rnd(2,9); ans=rnd(2,9+level); a=b*ans; op="÷"; }
+    return {q:a+" "+op+" "+b, a:String(ans)};
+  }
+  function start(){
+    score = 0; wrong = 0; level = 1;
+    endAt = Date.now()+60000;
+    stage.innerHTML = '<div class="timerbar"><i id="tb"></i></div><div class="mid" id="q"></div><div class="ans" id="ans">&nbsp;</div>'+keypad();
+    wireKeys(stage, press);
+    every(function(){
+      var left = endAt - Date.now();
+      var tb = document.getElementById("tb");
+      if(tb) tb.style.width = Math.max(0,left/600)+"%";
+      setStat('Верно: <b>'+score+'</b> · ошибок: '+wrong);
+      if(left <= 0) end();
+    }, 100);
+    nextQ();
+  }
+  function nextQ(){
+    cur = gen(); typed = "";
+    document.getElementById("q").textContent = cur.q+" = ?";
+    var a = document.getElementById("ans"); a.textContent = " "; a.style.color = "";
+  }
+  function press(k){
+    if(Date.now() >= endAt) return;
+    if(k==="del") typed = typed.slice(0,-1);
+    else if(typed.length < cur.a.length) typed += k;
+    document.getElementById("ans").textContent = typed || " ";
+    if(typed.length === cur.a.length){
+      if(typed === cur.a){ score++; if(score%4===0) level++; nextQ(); }
+      else {
+        wrong++;
+        var a = document.getElementById("ans"); a.style.color = "var(--bad)";
+        var keep = cur;
+        later(function(){ nextQ(); }, 250);
+      }
+    }
+  }
+  function end(){
+    clearTimers();
+    var nb = setBest("math", score, false);
+    finish(stage, score+" верно", ["Ошибок: <b>"+wrong+"</b>", nb? "Новый рекорд!" : "Рекорд: <b>"+data.best.math+"</b>"], gMath);
+  }
+}
+
+/* ---------- 4. Sequences ---------- */
+function makeSeq(level){
+  var t = rnd(1, Math.min(6, 2+level));
+  var s = [], i;
+  if(t===1){ var a=rnd(1,20), d=rnd(2,9); for(i=0;i<6;i++) s.push(a+d*i); }
+  else if(t===2){ var a2=rnd(1,5), r=rnd(2,3); for(i=0;i<6;i++) s.push(a2*Math.pow(r,i)); }
+  else if(t===3){ var a3=rnd(1,9), d3=rnd(1,4), dd=rnd(1,3), cur=a3, st=d3; for(i=0;i<6;i++){ s.push(cur); cur+=st; st+=dd; } }
+  else if(t===4){ var a4=rnd(1,10), x=rnd(2,6), y=rnd(1,5), c=a4; for(i=0;i<6;i++){ s.push(c); c += (i%2===0)? x : -y; } }
+  else if(t===5){ var f1=rnd(1,4), f2=rnd(1,5); s=[f1,f2]; for(i=2;i<6;i++) s.push(s[i-1]+s[i-2]); }
+  else { var k=rnd(1,4); for(i=1;i<=6;i++) s.push(i*i+k); }
+  return {shown:s.slice(0,5), ans:s[5]};
+}
+function gSeq(){
+  var stage = shell("seq");
+  var q = 0, score = 0, level = 1, t0 = Date.now();
+  function round(){
+    if(q>=10){ return end(); }
+    setStat('Вопрос <b>'+(q+1)+'/10</b> · верно: '+score);
+    var s = makeSeq(level);
+    var opts = [s.ans];
+    var guard = 0;
+    while(opts.length<4 && guard++<50){
+      var v = s.ans + rnd(-9,9);
+      if(v!==s.ans && v>0 && opts.indexOf(v)<0) opts.push(v);
+    }
+    while(opts.length<4) opts.push(s.ans+opts.length*11);
+    shuffle(opts);
+    var h = '<div class="hint">Какое число следующее?</div><div class="mid" style="font-size:26px">'+s.shown.join(", ")+", ?</div><div class=\"opts\">";
+    opts.forEach(function(o){ h += '<button class="opt" data-v="'+o+'">'+o+'</button>'; });
+    h += "</div>";
+    stage.innerHTML = h;
+    var locked = false;
+    stage.querySelectorAll(".opt").forEach(function(b){
+      b.onclick = function(){
+        if(locked) return; locked = true;
+        var v = +b.getAttribute("data-v");
+        if(v===s.ans){ b.classList.add("good"); score++; if(score%3===0) level++; }
+        else {
+          b.classList.add("bad");
+          stage.querySelectorAll(".opt").forEach(function(o){ if(+o.getAttribute("data-v")===s.ans) o.classList.add("good"); });
+        }
+        q++;
+        later(round, v===s.ans ? 500 : 1200);
+      };
+    });
+  }
+  function end(){
+    var sec = Math.round((Date.now()-t0)/1000);
+    var nb = setBest("seq", score, false);
+    finish(stage, score+" из 10", ["Время: <b>"+sec+" с</b>", nb? "Новый рекорд!" : "Рекорд: <b>"+data.best.seq+"/10</b>"], gSeq);
+  }
+  round();
+}
+
+/* ---------- 5. Grid memory ---------- */
+function gGrid(){
+  var stage = shell("grid");
+  var level = 1, lives = 3, best = 0;
+  function params(){
+    var size = level<=3 ? 3 : level<=7 ? 4 : 5;
+    var k = Math.min(2 + level, size*size-2);
+    return {size:size, k:k};
+  }
+  function round(){
+    var p = params();
+    setStat('Уровень <b>'+level+'</b> · <span class="lives">'+"❤".repeat(lives)+'</span>');
+    var cells = []; for(var i=0;i<p.size*p.size;i++) cells.push(i);
+    var target = shuffle(cells.slice()).slice(0,p.k);
+    var h = '<div class="hint" id="msg">Запомни клетки</div><div class="sg" style="grid-template-columns:repeat('+p.size+',1fr)">';
+    for(i=0;i<p.size*p.size;i++) h += '<button class="cell'+(target.indexOf(i)>=0?" on":"")+'" data-i="'+i+'"></button>';
+    h += '</div>';
+    stage.innerHTML = h;
+    var cs = stage.querySelectorAll(".cell");
+    cs.forEach(function(c){ c.onclick = null; });
+    later(function(){
+      cs.forEach(function(c){ c.classList.remove("on"); });
+      document.getElementById("msg").textContent = "Отметь их ("+p.k+")";
+      var found = 0, mistakes = 0, over = false;
+      cs.forEach(function(c){
+        c.onclick = function(){
+          if(over || c.classList.contains("good") || c.classList.contains("bad")) return;
+          var i = +c.getAttribute("data-i");
+          if(target.indexOf(i)>=0){
+            c.classList.add("good"); found++;
+            if(found===p.k){ over = true; best = Math.max(best, level); level++; later(round, 600); }
+          } else {
+            c.classList.add("bad"); mistakes++;
+            if(mistakes>=2){
+              over = true; lives--;
+              cs.forEach(function(x){ if(target.indexOf(+x.getAttribute("data-i"))>=0 && !x.classList.contains("good")) x.classList.add("on"); });
+              later(function(){ if(lives<=0) end(); else round(); }, 1300);
+            }
+          }
+        };
+      });
+    }, 1000 + p.k*350);
+  }
+  function end(){
+    var nb = setBest("grid", best, false);
+    finish(stage, "Уровень "+best, [nb? "Новый рекорд!" : "Рекорд: <b>"+data.best.grid+"</b>"], gGrid);
+  }
+  round();
+}
+
+if("serviceWorker" in navigator){
+  window.addEventListener("load", function(){
+    try{ navigator.serviceWorker.register("sw.js").catch(function(){}); }catch(e){}
+  });
+}
+home();
+})();
+</script>
+</body>
+</html>
